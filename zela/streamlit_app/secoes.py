@@ -12,7 +12,7 @@ from zela.storage.rotina import (
     listar_confirmacoes_do_dia,
     listar_medicamentos,
 )
-from zela.streamlit_app.estilo import badge_nivel
+from zela.streamlit_app.alertas import lista_alertas
 from zela.streamlit_app.graficos import (
     ALTURA_GRAFICO,
     grafico_presenca,
@@ -53,12 +53,12 @@ def renderizar_alertas(conn, idoso_id: str) -> None:
     if not alertas:
         st.write("Nenhum alerta registrado.")
         return
-    for alerta in reversed(alertas[-MAXIMO_ALERTAS_EXIBIDOS:]):
-        data_hora = alerta.timestamp.strftime("%d/%m %H:%M")
-        badge = badge_nivel(alerta.nivel.value)
-        st.markdown(
-            f"{badge} {data_hora} — {alerta.mensagem}", unsafe_allow_html=True
-        )
+    # Um bloco HTML só: um st.markdown por alerta somava as margens do
+    # Streamlit entre os itens e deixava o card carregado.
+    st.markdown(
+        lista_alertas(alertas, datetime.now(), maximo=MAXIMO_ALERTAS_EXIBIDOS),
+        unsafe_allow_html=True,
+    )
 
 
 def renderizar_grafico(conn, idoso_id: str) -> None:

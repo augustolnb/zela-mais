@@ -41,6 +41,29 @@ div[data-testid="stVerticalBlockBorderWrapper"] {
 .zela-badge-info { background: #F1F5F9; color: #475569; }
 .zela-badge-atencao { background: #FEF3C7; color: #92400E; }
 .zela-badge-critico { background: #FEE2E2; color: #B91C1C; }
+
+/* Card "Últimos alertas": um item compacto por alerta, com faixa lateral na
+   cor do nível. A mensagem para em 3 linhas; o texto inteiro fica no title. */
+.zela-alertas { display: flex; flex-direction: column; gap: 0.5rem; }
+.zela-alerta {
+    border-left: 3px solid #CBD5E1;
+    background: #F8FAFC;
+    border-radius: 0.5rem;
+    padding: 0.45rem 0.65rem 0.5rem;
+}
+.zela-alerta-atencao { border-left-color: #F59E0B; background: #FFFBEB; }
+.zela-alerta-critico { border-left-color: #DC2626; background: #FEF2F2; }
+.zela-alerta-topo { display: flex; align-items: center; gap: 0.35rem; margin-bottom: 0.2rem; }
+.zela-alerta-topo .zela-badge { margin-right: 0; font-size: 0.65rem; padding: 0.05rem 0.5rem; }
+.zela-alerta-quando { margin-left: auto; font-size: 0.75rem; color: #64748B; white-space: nowrap; }
+.zela-alerta-simulacao {
+    font-size: 0.65rem; color: #64748B;
+    border: 1px dashed #94A3B8; border-radius: 999px; padding: 0 0.4rem;
+}
+.zela-alerta-texto {
+    font-size: 0.85rem; line-height: 1.35; color: #1E293B;
+    display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden;
+}
 </style>
 """
 
@@ -188,6 +211,18 @@ hr {{ border-color: {AMARELO_DESTAQUE} !important; opacity: 0.5; }}
 .zela-badge-info {{ background: transparent; color: {BRANCO}; border: 1px solid {BRANCO}; }}
 .zela-badge-atencao {{ background: transparent; color: {AMARELO_DESTAQUE}; border: 1px solid {AMARELO_DESTAQUE}; }}
 .zela-badge-critico {{ background: {AMARELO_DESTAQUE}; color: {AZUL_NOTURNO} !important; }}
+
+/* Card de alertas: itens um tom acima do cartão; o nível vai na faixa lateral */
+[data-testid="stApp"] .zela-alerta {{ background: #1B3560; border-left-color: {_CINZA_CLARO}; }}
+[data-testid="stApp"] .zela-alerta-atencao {{ border-left-color: {AMARELO_DESTAQUE}; }}
+[data-testid="stApp"] .zela-alerta-critico {{
+    border-left-color: {AMARELO_DESTAQUE}; background: rgba(255, 214, 10, 0.08);
+}}
+[data-testid="stApp"] .zela-alerta-texto {{ color: {BRANCO}; }}
+[data-testid="stApp"] .zela-alerta-quando, [data-testid="stApp"] .zela-alerta-simulacao {{
+    color: {_CINZA_CLARO};
+}}
+[data-testid="stApp"] .zela-alerta-simulacao {{ border-color: {_CINZA_CLARO}; }}
 
 /* A tabela desenha em canvas com fundo claro: inverte as cores e mescla
    sobre o azul do cartão, para o preto invertido virar azul escuro. A faixa

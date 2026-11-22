@@ -227,11 +227,10 @@ renderizar_alertas(conn, "idosa-1")
     at.run()
 
     assert at.exception == []
-    textos = [m.value for m in at.markdown]
-    assert not any("Alerta numero 0" in t for t in textos)  # o mais antigo foi cortado pelo limite
-    indice_10 = next(i for i, t in enumerate(textos) if "Alerta numero 10" in t)
-    indice_9 = next(i for i, t in enumerate(textos) if "Alerta numero 9" in t)
-    assert indice_10 < indice_9  # o mais recente (10) aparece antes do penultimo (9)
+    lista = next(m.value for m in at.markdown if "zela-alertas" in m.value)
+    assert "Alerta numero 0" not in lista  # o mais antigo foi cortado pelo limite
+    # o mais recente (10) aparece antes do penúltimo (9)
+    assert lista.index("Alerta numero 10") < lista.index("Alerta numero 9")
 
 
 def test_renderizar_grafico_mostra_leituras_de_presenca(tmp_path):
