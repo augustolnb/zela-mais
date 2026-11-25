@@ -208,11 +208,10 @@ testes está em `docs/testes/estrategia-e-resultados.md`.
 
 ### Lembrete de remédio com enquete
 
-O lembrete chega como enquete de escolha única:
+O lembrete chega como enquete de escolha única, e o bot responde a cada
+voto:
 
-> Hora de tomar dapagliflozina (1.0 comprimido). Já tomou?
-> ◯ ✅ Tomei
-> ◯ ⏰ Ainda não
+![Lembretes de remédio como enquete no WhatsApp e as respostas do bot aos votos](docs/relatorio/imagens/enquete_remedio.png)
 
 - **✅ Tomei** registra a dose sem passar pela IA (como atrasada depois de
   30 min do horário). Votar de novo não duplica.
@@ -261,6 +260,11 @@ resposta em 60 segundos, todos os familiares são avisados. Pedido de ajuda
 avisa na hora. "Estou bem" ou "não avise" cancelam o aviso, e duas recusas
 em 7 dias geram uma advertência à família.
 
+Em produção, "Não consigo mexer o braço" foi tratado como possível AVC e,
+sem resposta, a família foi avisada:
+
+![Teste real: "Não consigo mexer o braço" tratado como possível AVC, com aviso à família](docs/relatorio/imagens/aviso_familia_avc.png)
+
 ### Regras de monitoramento
 
 Avaliadas a cada 15 min; vale a condição mais grave:
@@ -284,7 +288,7 @@ noites. Se a noite ficar 30% acima ou abaixo da média, o familiar recebe um
 aviso de tendência pelo WhatsApp, que também aparece no painel, sem escada
 de escalonamento:
 
-> Aviso: Sono da noite fora do habitual: 10.4h (média 5.9h).
+![Aviso de sono: noite de 10,4 h contra a média de 5,9 h](docs/relatorio/imagens/sono_aviso_whatsapp.jpeg)
 
 A regra só vale com pelo menos 7 noites de histórico e envia no máximo um
 aviso por dia. As versões repetidas da mesma sessão de sono, que o Mi
@@ -407,6 +411,16 @@ Histamin, omeprazol, ácido acetilsalicílico e anlodipino ficam em `zela/conhec
 registro e fonte. O backend sincroniza o índice do ChromaDB e só gera
 embeddings do que mudou. Para adicionar uma bula, converta o PDF da bula do
 paciente com `pdftotext -layout` e `scripts/importar_bula.py`.
+
+O bot responde com base nos trechos da bula, cita a bula e o laboratório e
+não orienta mudança de dose. Se o remédio não está na base, avisa em vez de
+inventar:
+
+![RAG: "O Histamin dá sono?", respondida com a bula do Histamin](docs/relatorio/imagens/rag_histamin.png)
+
+![RAG: "Esqueci de tomar a dipirona, o que eu faço?", respondida com a bula da dipirona](docs/relatorio/imagens/rag_dipirona.png)
+
+![RAG: o paracetamol não está na base, e o bot não inventa a resposta](docs/relatorio/imagens/rag_paracetamol.png)
 
 ### Workflow n8n
 
