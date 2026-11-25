@@ -202,3 +202,21 @@ def test_enviar_enquete_sem_id_na_resposta_levanta_erro(monkeypatch):
 
     with pytest.raises(ValueError):
         WahaClient(base_url="http://localhost:3000").enviar_enquete("+5511987654321", "P?", ["a", "b"])
+
+
+def test_status_sessao_devolve_status_do_waha(monkeypatch):
+    chamadas = []
+
+    def get_falso(url, headers, timeout):
+        chamadas.append((url, headers, timeout))
+        return _RespostaFalsa({"name": "default", "status": "WORKING"})
+
+    monkeypatch.setattr(httpx, "get", get_falso)
+    cliente = WahaClient("http://waha:3000/", api_key="k")
+    assert cliente.status_sessao() == "WORKING"
+    assert chamadas == [("http://waha:3000/api/sessions/default", {"X-Api-Key": "k"}, 5)]
+
+
+def test_status_sessao_sem_resposta_devolve_none():
+    # a fixture autouse faz httpx.get levantar ConnectError
+    assert WahaClient("http://waha:3000").status_sessao() is None

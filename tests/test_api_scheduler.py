@@ -1194,3 +1194,15 @@ def test_relembrete_de_outro_dia_nao_sai(tmp_path, monkeypatch):
     verificar_e_enviar_lembretes(caminho_db, "idosa-1", waha)
 
     assert waha.enviados == []
+
+
+def test_iniciar_scheduler_envolve_tarefas_com_telemetria_e_checa_whatsapp(tmp_path):
+    caminho_db = str(tmp_path / "teste.db")
+    conectar(caminho_db)
+    agendador = iniciar_scheduler(caminho_db, "idosa-1", _WahaFalso())
+    try:
+        jobs = {job.id: job for job in agendador.get_jobs()}
+        assert jobs["verificar_lembretes"].func.__wrapped__ is verificar_e_enviar_lembretes
+        assert "checar_whatsapp" in jobs
+    finally:
+        agendador.shutdown()

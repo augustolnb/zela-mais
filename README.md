@@ -453,6 +453,18 @@ docker compose up -d --build
 docker compose exec streamlit python -m zela.streamlit_app.usuarios criar familia
 ```
 
+### Observabilidade no hub crm-monstrao (opcional)
+
+Com `docker-compose.monstrao.yml`, o backend manda ao hub crm-monstrao um heartbeat a cada 5 min
+(`degraded` quando a sessão do WhatsApp não está `WORKING`), as rodadas do agendador que fizeram
+algo ou falharam, os avisos à família (enviados/falhas) e os tokens de cada conversa. Nada pessoal
+sai: sem nomes, telefones, sintomas ou texto (ver `zela/api/telemetria.py`).
+
+```bash
+# MONSTRAO_TOKEN no .env (token da automação no hub)
+docker compose -f docker-compose.yml -f docker-compose.monstrao.yml up -d --build
+```
+
 ## Limitações conhecidas
 
 - O Mi Fitness só compartilha com o Health Connect os batimentos medidos em
