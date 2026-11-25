@@ -16,8 +16,10 @@ informada:
 
 - **Lembretes de remédio** como enquete no WhatsApp ("✅ Tomei" / "⏰ Ainda
   não"), respondida com um toque, e também como notificação na pulseira.
-- **Lembretes de compromissos** pelo WhatsApp e pelo Google Agenda, que
-  aparece na pulseira.
+- **Lembretes de compromissos** pelo WhatsApp (na véspera, de manhã e 1 h
+  antes) e pelo Google Agenda, que aparece na pulseira.
+- **Aviso de sono** à família quando a noite fica 30% acima ou abaixo da
+  média das últimas 14 noites.
 - **Aviso à família em 60 segundos** quando o idoso relata um sintoma grave
   e não responde, e na hora quando pede ajuda.
 - **Monitoramento** com uma pulseira Xiaomi Smart Band 10 Pro (passos, sono
@@ -206,11 +208,10 @@ testes está em `docs/testes/estrategia-e-resultados.md`.
 
 ### Lembrete de remédio com enquete
 
-O lembrete chega como enquete de escolha única:
+O lembrete chega como enquete de escolha única, e o bot responde a cada
+voto:
 
-> Hora de tomar dapagliflozina (1.0 comprimido). Já tomou?
-> ◯ ✅ Tomei
-> ◯ ⏰ Ainda não
+![Lembretes de remédio como enquete no WhatsApp e as respostas do bot aos votos](docs/relatorio/imagens/enquete_remedio.png)
 
 - **✅ Tomei** registra a dose sem passar pela IA (como atrasada depois de
   30 min do horário). Votar de novo não duplica.
@@ -222,6 +223,35 @@ O lembrete chega como enquete de escolha única:
 Botões só existem na API oficial da Meta; no WAHA (WhatsApp Web), a enquete
 é a alternativa.
 
+### Lembretes de compromissos
+
+Cada compromisso cadastrado no painel gera lembretes no WhatsApp do idoso:
+
+| Quando | Mensagem |
+|---|---|
+| Ao cadastrar | "Você tem um compromisso agendado: …" |
+| Véspera (24 h antes) | "Lembrete: amanhã você tem …" |
+| No dia, às 08:00 | "Bom dia! Hoje você tem …" |
+| 1 h antes | "Daqui a pouco, às 10:30, você tem …" |
+| Ao remover no painel | Aviso de cancelamento |
+
+Se o compromisso é logo depois das 8 h, só sai o lembrete de 1 h antes.
+Cada lembrete enviado fica registrado e não se repete depois de um
+reinício. O compromisso também é criado no Google Agenda, e o lembrete
+aparece no celular e na pulseira (seção
+[Google Agenda e Gmail na pulseira](#google-agenda-e-gmail-na-pulseira)).
+
+<table>
+  <tr>
+    <td align="center"><img src="docs/relatorio/imagens/compromisso_exame_vespera.jpeg" width="320" alt="Lembrete de véspera no WhatsApp"><br><img src="docs/relatorio/imagens/compromisso_exame_1h_antes.jpeg" width="320" alt="Lembrete de 1 hora antes no WhatsApp"><br><img src="docs/relatorio/imagens/compromisso_exame_google_agenda.jpeg" width="320" alt="Notificação do Google Agenda no celular"></td>
+    <td align="center"><img src="docs/relatorio/imagens/compromisso_exame_pulseira.jpeg" width="220" alt="Lembrete do compromisso na pulseira"></td>
+  </tr>
+  <tr>
+    <td align="center">WhatsApp (véspera e 1 h antes) e Google Agenda</td>
+    <td align="center">Lembrete na pulseira</td>
+  </tr>
+</table>
+
 ### Aviso à família após relato de sintomas
 
 Toda mensagem do idoso passa antes por um classificador determinístico de
@@ -229,6 +259,11 @@ sintomas. Um sintoma grave faz o bot perguntar se está tudo bem; sem
 resposta em 60 segundos, todos os familiares são avisados. Pedido de ajuda
 avisa na hora. "Estou bem" ou "não avise" cancelam o aviso, e duas recusas
 em 7 dias geram uma advertência à família.
+
+Em produção, "Não consigo mexer o braço" foi tratado como possível AVC e,
+sem resposta, a família foi avisada:
+
+![Teste real: "Não consigo mexer o braço" tratado como possível AVC, com aviso à família](docs/relatorio/imagens/aviso_familia_avc.png)
 
 ### Regras de monitoramento
 
@@ -243,8 +278,21 @@ Avaliadas a cada 15 min; vale a condição mais grave:
 | NORMAL | Nenhuma das condições acima |
 
 Em RISCO, a escada pergunta ao idoso, avisa a família depois de 10 min sem
-resposta e simula o contato de emergência 15 min depois. O sono da noite
-30% acima ou abaixo da média gera um aviso de tendência no resumo da manhã.
+resposta e simula o contato de emergência 15 min depois.
+
+### Monitoramento do sono
+
+Todo dia às 09:00, depois que o celular sincroniza a noite, as horas
+dormidas na noite anterior são comparadas com a média das últimas 14
+noites. Se a noite ficar 30% acima ou abaixo da média, o familiar recebe um
+aviso de tendência pelo WhatsApp, que também aparece no painel, sem escada
+de escalonamento:
+
+![Aviso de sono: noite de 10,4 h contra a média de 5,9 h](docs/relatorio/imagens/sono_aviso_whatsapp.jpeg)
+
+A regra só vale com pelo menos 7 noites de histórico e envia no máximo um
+aviso por dia. As versões repetidas da mesma sessão de sono, que o Mi
+Fitness atualiza durante a noite, contam uma vez só.
 
 ### Sensores
 
@@ -363,6 +411,16 @@ Histamin, omeprazol, ácido acetilsalicílico e anlodipino ficam em `zela/conhec
 registro e fonte. O backend sincroniza o índice do ChromaDB e só gera
 embeddings do que mudou. Para adicionar uma bula, converta o PDF da bula do
 paciente com `pdftotext -layout` e `scripts/importar_bula.py`.
+
+O bot responde com base nos trechos da bula, cita a bula e o laboratório e
+não orienta mudança de dose. Se o remédio não está na base, avisa em vez de
+inventar:
+
+![RAG: "O Histamin dá sono?", respondida com a bula do Histamin](docs/relatorio/imagens/rag_histamin.png)
+
+![RAG: "Esqueci de tomar a dipirona, o que eu faço?", respondida com a bula da dipirona](docs/relatorio/imagens/rag_dipirona.png)
+
+![RAG: o paracetamol não está na base, e o bot não inventa a resposta](docs/relatorio/imagens/rag_paracetamol.png)
 
 ### Workflow n8n
 
