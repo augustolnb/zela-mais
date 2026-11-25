@@ -240,3 +240,15 @@ def test_execucao_envia_quota_so_quando_ha(ambiente, servidor):
     assert servidor.recebidos[0][2]["quota"] == {"fiveHour": {"usedPct": 38.0}}
     assert "quota" not in servidor.recebidos[1][2]
 
+
+
+def test_hub_fora_do_ar_nao_gasta_tentativas_do_buffer(ambiente):
+    apontar, buffer = ambiente
+    buffer.write_text(json.dumps({"path": "/api/v1/executions", "payload": {"externalRef": "bom"},
+                                  "tentativas": 0}) + "\n")
+    apontar("http://127.0.0.1:9")  # porta fechada: erro de conexão, não 5xx
+    for i in range(hub_client._MAX_TENTATIVAS + 2):
+        _execucao(f"r{i}")
+    refs = [json.loads(linha)["payload"]["externalRef"] for linha in _linhas(buffer)]
+    assert refs[0] == "bom"
+    assert json.loads(_linhas(buffer)[0])["tentativas"] == 0

@@ -10,6 +10,8 @@ from __future__ import annotations
 import functools
 import logging
 import os
+import queue
+import threading
 import uuid
 from datetime import datetime, timezone
 
@@ -18,6 +20,44 @@ from zela.integrations import monstrao
 logger = logging.getLogger(__name__)
 
 INTERVALO_HEARTBEAT_MINUTOS = 5
+_MAX_FILA = 200
+
+# Quem chama só enfileira: uma única thread fala com o hub, então hub lento ou fora do ar nunca
+# atrasa resposta ao idoso, aviso à família ou tarefa do agendador. Fila cheia descarta.
+_fila: queue.Queue = queue.Queue(maxsize=_MAX_FILA)
+_trabalhador: threading.Thread | None = None
+_trava_trabalhador = threading.Lock()
+
+
+def _consumir() -> None:
+    while True:
+        fn, kwargs = _fila.get()
+        try:
+            fn(**kwargs)
+        except Exception:
+            logger.warning("falha ao enviar telemetria ao hub", exc_info=True)
+        finally:
+            _fila.task_done()
+
+
+def _enfileirar(fn, **kwargs) -> None:
+    global _trabalhador
+    try:
+        if _trabalhador is None or not _trabalhador.is_alive():
+            with _trava_trabalhador:
+                if _trabalhador is None or not _trabalhador.is_alive():
+                    _trabalhador = threading.Thread(target=_consumir, name="telemetria-hub", daemon=True)
+                    _trabalhador.start()
+        _fila.put_nowait((fn, kwargs))
+    except queue.Full:
+        logger.warning("fila de telemetria cheia; registro descartado")
+    except Exception:
+        logger.warning("falha ao enfileirar telemetria", exc_info=True)
+
+
+def aguardar_envios() -> None:
+    """Espera a fila esvaziar (testes)."""
+    _fila.join()
 
 
 def _agora() -> datetime:
@@ -29,18 +69,16 @@ def _versao() -> str | None:
 
 
 def _registrar(trigger: str, inicio: datetime, status: str, **extra) -> None:
-    try:
-        monstrao.record_execution(
-            external_ref=f"{trigger}-{uuid.uuid4().hex[:16]}",
-            trigger=trigger,
-            started_at=inicio,
-            finished_at=_agora(),
-            status=status,
-            version=_versao(),
-            **extra,
-        )
-    except Exception:  # telemetria nunca derruba tarefa
-        logger.warning("falha ao registrar telemetria de %s", trigger, exc_info=True)
+    _enfileirar(
+        monstrao.record_execution,
+        external_ref=f"{trigger}-{uuid.uuid4().hex[:16]}",
+        trigger=trigger,
+        started_at=inicio,
+        finished_at=_agora(),
+        status=status,
+        version=_versao(),
+        **extra,
+    )
 
 
 def monitorar(nome: str, fn):
@@ -69,10 +107,7 @@ def checar_whatsapp(waha_client) -> None:
     except Exception:
         status = None
     conectado = status == "WORKING"
-    try:
-        monstrao.heartbeat("ok" if conectado else "degraded", _versao())
-    except Exception:
-        logger.warning("falha ao enviar heartbeat ao hub", exc_info=True)
+    _enfileirar(monstrao.heartbeat, status="ok" if conectado else "degraded", version=_versao())
     if not conectado:
         _registrar(
             "whatsapp", inicio, "failed",

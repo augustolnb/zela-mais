@@ -9,7 +9,7 @@ Fail-open por contrato: nenhuma função levanta exceção. Execução com falha
 (rede, 5xx, 429, 401/403 — token errado é config a corrigir, não payload ruim) vai para um
 buffer em disco (no máximo `_MAX_BUFFER` linhas, as mais antigas saem primeiro), reenviado
 em ordem antes do próximo envio, no máximo `_MAX_ESVAZIAR` linhas por chamada (nunca prende
-o chamador por muito tempo). Uma linha que falha `_MAX_TENTATIVAS` vezes é descartada, para
+o chamador por muito tempo). Uma linha que recebe 5xx `_MAX_TENTATIVAS` vezes é descartada (rede caída não conta), para
 um payload que sempre dá 5xx não travar o buffer. Os demais 4xx são descartados com log.
 Heartbeat nunca vai para o buffer: reenviado depois, não diz nada sobre o passado.
 
@@ -46,7 +46,7 @@ def _buffer_path() -> str:
 
 
 def _enviar(path: str, payload: dict) -> str:
-    """'ok' | 'descartar' (4xx permanente) | 'tentar_depois' (rede, 5xx, 429)."""
+    """'ok' | 'descartar' (4xx permanente) | 'erro_servidor' (5xx) | 'tentar_depois' (rede, 401/403/429)."""
     url = os.environ["MONSTRAO_URL"].rstrip("/") + path
     req = urllib.request.Request(
         url,
@@ -64,7 +64,7 @@ def _enviar(path: str, payload: dict) -> str:
         if 400 <= exc.code < 500 and exc.code not in (401, 403, 429):
             logger.warning("hub rejeitou %s (HTTP %s); descartado", path, exc.code)
             return "descartar"
-        return "tentar_depois"
+        return "erro_servidor" if exc.code >= 500 else "tentar_depois"
     except Exception:  # rede, timeout, URL inválida: nunca propaga
         return "tentar_depois"
 
@@ -120,6 +120,10 @@ def _esvaziar_buffer() -> bool:
             logger.warning("linha corrompida no buffer do hub; ignorada")
             continue
         if resultado == "tentar_depois":
+            # Hub inalcançável ou token a corrigir: não é culpa da linha, não gasta tentativa.
+            restantes = linhas[i:]
+            break
+        if resultado == "erro_servidor":
             tentativas = int(entrada.get("tentativas") or 0) + 1
             if tentativas >= _MAX_TENTATIVAS:
                 logger.warning("hub: execução %s descartada após %s tentativas",
@@ -141,7 +145,7 @@ def _send(path: str, payload: dict, *, bufferizar: bool = True) -> None:
                 if bufferizar:
                     _gravar_no_buffer(path, payload)
                 return
-            if _enviar(path, payload) == "tentar_depois" and bufferizar:
+            if _enviar(path, payload) in ("tentar_depois", "erro_servidor") and bufferizar:
                 _gravar_no_buffer(path, payload)
     except Exception:  # fail-open: telemetria nunca derruba o Zela+
         logger.warning("falha inesperada na telemetria do hub", exc_info=True)

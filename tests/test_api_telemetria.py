@@ -6,11 +6,20 @@ from zela.api import telemetria
 from zela.integrations import monstrao
 
 
+class _Registro(dict):
+    """Lê o que já foi enviado esperando a fila de envio esvaziar."""
+
+    def __getitem__(self, chave):
+        telemetria.aguardar_envios()
+        return super().__getitem__(chave)
+
+
 @pytest.fixture
 def enviados(monkeypatch):
-    registro = {"execucoes": [], "heartbeats": []}
-    monkeypatch.setattr(monstrao, "record_execution", lambda **kw: registro["execucoes"].append(kw))
-    monkeypatch.setattr(monstrao, "heartbeat", lambda status="ok", version=None: registro["heartbeats"].append(status))
+    registro = _Registro(execucoes=[], heartbeats=[])
+    monkeypatch.setattr(monstrao, "record_execution", lambda **kw: dict.__getitem__(registro, "execucoes").append(kw))
+    monkeypatch.setattr(monstrao, "heartbeat",
+                        lambda status="ok", version=None: dict.__getitem__(registro, "heartbeats").append(status))
     return registro
 
 
@@ -112,3 +121,28 @@ def test_conversa_vira_execucao_com_uso(enviados, monkeypatch):
     (e,) = enviados["execucoes"]
     assert e["trigger"] == "conversa" and e["status"] == "success"
     assert e["llm_usage"][0]["inputTokens"] == 10
+
+
+def test_hub_lento_nao_atrasa_a_tarefa(monkeypatch):
+    import time
+
+    monkeypatch.setattr(monstrao, "record_execution", lambda **kw: time.sleep(1.5))
+    inicio = time.monotonic()
+    telemetria.monitorar("x", lambda: [1])()
+    telemetria.registrar_avisos(enviadas=1, falhas=0, esgotadas=0)
+    assert time.monotonic() - inicio < 0.3
+    telemetria.aguardar_envios()
+
+
+def test_fila_cheia_descarta_sem_bloquear(monkeypatch):
+    import threading
+    import time
+
+    liberar = threading.Event()
+    monkeypatch.setattr(monstrao, "record_execution", lambda **kw: liberar.wait(5))
+    inicio = time.monotonic()
+    for _ in range(telemetria._MAX_FILA + 50):
+        telemetria.registrar_avisos(enviadas=1, falhas=0, esgotadas=0)
+    assert time.monotonic() - inicio < 0.5
+    liberar.set()
+    telemetria.aguardar_envios()
