@@ -82,7 +82,7 @@ def _registrar(trigger: str, inicio: datetime, status: str, **extra) -> None:
 
 
 def monitorar(nome: str, fn):
-    """Envolve uma tarefa do agendador: lista não vazia → sucesso; exceção → falha (e relança)."""
+    """Envolve uma tarefa do agendador: lista não vazia → succeeded; exceção → falha (e relança)."""
 
     @functools.wraps(fn)
     def tarefa(*args, **kwargs):
@@ -93,7 +93,7 @@ def monitorar(nome: str, fn):
             _registrar(nome, inicio, "failed", error=(type(exc).__name__, f"falha na tarefa {nome}"))
             raise
         if isinstance(resultado, (list, tuple)) and resultado:
-            _registrar(nome, inicio, "success", output_summary={"itens": len(resultado)})
+            _registrar(nome, inicio, "succeeded", output_summary={"itens": len(resultado)})
         return resultado
 
     return tarefa
@@ -124,7 +124,7 @@ def registrar_avisos(*, enviadas: int, falhas: int, esgotadas: int, inicio: date
         _registrar("aviso_familia", inicio or _agora(), "failed", output_summary=resumo,
                    error=("AvisoFamiliaFalhou", f"{falhas} envio(s) à família falharam, {esgotadas} sem nova tentativa"))
     else:
-        _registrar("aviso_familia", inicio or _agora(), "success", output_summary=resumo)
+        _registrar("aviso_familia", inicio or _agora(), "succeeded", output_summary=resumo)
 
 
 def _modelo_atual() -> tuple[str, str]:
@@ -167,7 +167,7 @@ def registrar_conversa(inicio: datetime, eventos, erro: BaseException | None) ->
     except Exception:
         uso = []
     if erro is None:
-        _registrar("conversa", inicio, "success", llm_usage=uso)
+        _registrar("conversa", inicio, "succeeded", llm_usage=uso)
     else:
         _registrar("conversa", inicio, "failed", llm_usage=uso,
                    error=(type(erro).__name__, "falha ao processar mensagem"))

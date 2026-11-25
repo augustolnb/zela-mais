@@ -27,7 +27,7 @@ def test_tarefa_com_itens_vira_execucao_de_sucesso(enviados):
     tarefa = telemetria.monitorar("verificar_lembretes", lambda: ["a", "b"])
     assert tarefa() == ["a", "b"]
     (e,) = enviados["execucoes"]
-    assert e["trigger"] == "verificar_lembretes" and e["status"] == "success"
+    assert e["trigger"] == "verificar_lembretes" and e["status"] == "succeeded"
     assert e["output_summary"] == {"itens": 2}
 
 
@@ -84,7 +84,7 @@ def test_avisos_a_familia_registram_contagens(enviados):
     telemetria.registrar_avisos(enviadas=0, falhas=1, esgotadas=1)
     telemetria.registrar_avisos(enviadas=0, falhas=0, esgotadas=0)
     ok, falha = enviados["execucoes"]
-    assert ok["trigger"] == "aviso_familia" and ok["status"] == "success"
+    assert ok["trigger"] == "aviso_familia" and ok["status"] == "succeeded"
     assert ok["output_summary"] == {"enviadas": 1, "falhas": 0, "esgotadas": 0}
     assert falha["status"] == "failed" and falha["error"][0] == "AvisoFamiliaFalhou"
 
@@ -119,7 +119,7 @@ def test_conversa_vira_execucao_com_uso(enviados, monkeypatch):
     from datetime import datetime, timezone
     telemetria.registrar_conversa(datetime.now(timezone.utc), [_evento(10, 2)], erro=None)
     (e,) = enviados["execucoes"]
-    assert e["trigger"] == "conversa" and e["status"] == "success"
+    assert e["trigger"] == "conversa" and e["status"] == "succeeded"
     assert e["llm_usage"][0]["inputTokens"] == 10
 
 
@@ -146,3 +146,20 @@ def test_fila_cheia_descarta_sem_bloquear(monkeypatch):
     assert time.monotonic() - inicio < 0.5
     liberar.set()
     telemetria.aguardar_envios()
+
+
+# Status aceitos pelo hub (crm-monstrao packages/core/src/ingest/schema.ts EXECUTION_STATUSES).
+_STATUS_DO_HUB = {"running", "succeeded", "failed", "timeout", "cancelled"}
+
+
+def test_todo_status_enviado_e_aceito_pelo_hub(enviados):
+    telemetria.monitorar("a", lambda: [1])()
+    with pytest.raises(ValueError):
+        telemetria.monitorar("b", lambda: (_ for _ in ()).throw(ValueError()))()
+    telemetria.checar_whatsapp(_Waha(None))
+    telemetria.registrar_avisos(enviadas=1, falhas=0, esgotadas=0)
+    telemetria.registrar_avisos(enviadas=0, falhas=1, esgotadas=0)
+    from datetime import datetime, timezone
+    telemetria.registrar_conversa(datetime.now(timezone.utc), [], erro=None)
+    telemetria.registrar_conversa(datetime.now(timezone.utc), [], erro=RuntimeError())
+    assert {e["status"] for e in enviados["execucoes"]} <= _STATUS_DO_HUB
