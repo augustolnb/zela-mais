@@ -16,8 +16,10 @@ informada:
 
 - **Lembretes de remédio** como enquete no WhatsApp ("✅ Tomei" / "⏰ Ainda
   não"), respondida com um toque, e também como notificação na pulseira.
-- **Lembretes de compromissos** pelo WhatsApp e pelo Google Agenda, que
-  aparece na pulseira.
+- **Lembretes de compromissos** pelo WhatsApp (na véspera, de manhã e 1 h
+  antes) e pelo Google Agenda, que aparece na pulseira.
+- **Aviso de sono** à família quando a noite fica 30% acima ou abaixo da
+  média das últimas 14 noites.
 - **Aviso à família em 60 segundos** quando o idoso relata um sintoma grave
   e não responde, e na hora quando pede ajuda.
 - **Monitoramento** com uma pulseira Xiaomi Smart Band 10 Pro (passos, sono
@@ -222,6 +224,35 @@ O lembrete chega como enquete de escolha única:
 Botões só existem na API oficial da Meta; no WAHA (WhatsApp Web), a enquete
 é a alternativa.
 
+### Lembretes de compromissos
+
+Cada compromisso cadastrado no painel gera lembretes no WhatsApp do idoso:
+
+| Quando | Mensagem |
+|---|---|
+| Ao cadastrar | "Você tem um compromisso agendado: …" |
+| Véspera (24 h antes) | "Lembrete: amanhã você tem …" |
+| No dia, às 08:00 | "Bom dia! Hoje você tem …" |
+| 1 h antes | "Daqui a pouco, às 10:30, você tem …" |
+| Ao remover no painel | Aviso de cancelamento |
+
+Se o compromisso é logo depois das 8 h, só sai o lembrete de 1 h antes.
+Cada lembrete enviado fica registrado e não se repete depois de um
+reinício. O compromisso também é criado no Google Agenda, e o lembrete
+aparece no celular e na pulseira (seção
+[Google Agenda e Gmail na pulseira](#google-agenda-e-gmail-na-pulseira)).
+
+<table>
+  <tr>
+    <td align="center"><img src="docs/relatorio/imagens/compromisso_exame_vespera.jpeg" width="320" alt="Lembrete de véspera no WhatsApp"><br><img src="docs/relatorio/imagens/compromisso_exame_1h_antes.jpeg" width="320" alt="Lembrete de 1 hora antes no WhatsApp"><br><img src="docs/relatorio/imagens/compromisso_exame_google_agenda.jpeg" width="320" alt="Notificação do Google Agenda no celular"></td>
+    <td align="center"><img src="docs/relatorio/imagens/compromisso_exame_pulseira.jpeg" width="220" alt="Lembrete do compromisso na pulseira"></td>
+  </tr>
+  <tr>
+    <td align="center">WhatsApp (véspera e 1 h antes) e Google Agenda</td>
+    <td align="center">Lembrete na pulseira</td>
+  </tr>
+</table>
+
 ### Aviso à família após relato de sintomas
 
 Toda mensagem do idoso passa antes por um classificador determinístico de
@@ -243,8 +274,21 @@ Avaliadas a cada 15 min; vale a condição mais grave:
 | NORMAL | Nenhuma das condições acima |
 
 Em RISCO, a escada pergunta ao idoso, avisa a família depois de 10 min sem
-resposta e simula o contato de emergência 15 min depois. O sono da noite
-30% acima ou abaixo da média gera um aviso de tendência no resumo da manhã.
+resposta e simula o contato de emergência 15 min depois.
+
+### Monitoramento do sono
+
+Todo dia às 09:00, depois que o celular sincroniza a noite, as horas
+dormidas na noite anterior são comparadas com a média das últimas 14
+noites. Se a noite ficar 30% acima ou abaixo da média, o familiar recebe um
+aviso de tendência pelo WhatsApp, que também aparece no painel, sem escada
+de escalonamento:
+
+> Aviso: Sono da noite fora do habitual: 10.4h (média 5.9h).
+
+A regra só vale com pelo menos 7 noites de histórico e envia no máximo um
+aviso por dia. As versões repetidas da mesma sessão de sono, que o Mi
+Fitness atualiza durante a noite, contam uma vez só.
 
 ### Sensores
 
