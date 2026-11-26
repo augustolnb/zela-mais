@@ -5,6 +5,7 @@ import threading
 from datetime import datetime, timedelta, timezone
 from typing import Callable
 
+from zela.api import telemetria
 from zela.domain.sintomas import CategoriaMensagem, classificar_mensagem
 from zela.models.alertas import Alerta, CanalAlerta, NivelAlerta, StatusAlerta
 from zela.models.episodio import (
@@ -222,12 +223,14 @@ def _orientar_paciente_se_ninguem_recebeu(conn, perfil, episodio_id: int, waha_c
 def enviar_notificacoes_pendentes(
     conn: sqlite3.Connection, perfil: PerfilIdoso, idoso_id: str, waha_client, agora: datetime
 ) -> None:
+    enviadas = falhas = esgotadas = 0
     with _lock_envio:
         for notificacao in listar_notificacoes_devidas(conn, idoso_id, agora):
             tentativas = notificacao.tentativas + 1
             try:
                 waha_client.enviar_texto(notificacao.telefone, notificacao.mensagem)
             except Exception:
+                falhas += 1
                 logger.exception(
                     "Falha ao notificar %s (tentativa %s de %s)", notificacao.destinatario, tentativas, MAX_TENTATIVAS
                 )
@@ -236,6 +239,7 @@ def enviar_notificacoes_pendentes(
                 with conn:
                     atualizar_notificacao(conn, notificacao.id, status, tentativas, agora + INTERVALO_REENVIO)
                 if esgotou:
+                    esgotadas += 1
                     _registrar_alerta(conn, notificacao, StatusAlerta.FALHOU, idoso_id, agora)
                     if notificacao.tipo == TipoNotificacao.AVISO:
                         _orientar_paciente_se_ninguem_recebeu(conn, perfil, notificacao.episodio_id, waha_client)
@@ -243,6 +247,11 @@ def enviar_notificacoes_pendentes(
             with conn:
                 atualizar_notificacao(conn, notificacao.id, StatusNotificacao.ENVIADO, tentativas, agora)
             _registrar_alerta(conn, notificacao, StatusAlerta.ENVIADO, idoso_id, agora)
+            enviadas += 1
+    try:
+        telemetria.registrar_avisos(enviadas=enviadas, falhas=falhas, esgotadas=esgotadas)
+    except Exception:  # telemetria nunca impede o aviso
+        logger.warning("falha ao registrar avisos no hub", exc_info=True)
 
 
 def processar_episodios(caminho_db: str, idoso_id: str, waha_client, agora: datetime | None = None) -> None:

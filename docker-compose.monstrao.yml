@@ -1,0 +1,17 @@
+# Telemetria para o hub crm-monstrao (heartbeat + execuções do Zela+).
+# Uso: docker compose -f docker-compose.yml -f docker-compose.monstrao.yml up -d
+# Sem este arquivo o Zela+ sobe exatamente como antes. Pré-requisito: a rede `monstrao-net`
+# existir (o hub a usa). Só o backend fala com o hub; nada pessoal é enviado (zela/api/telemetria.py).
+services:
+  backend:
+    environment:
+      - MONSTRAO_URL=http://web:3001
+      - MONSTRAO_TOKEN=${MONSTRAO_TOKEN:?defina MONSTRAO_TOKEN no .env}
+      - MONSTRAO_BUFFER_PATH=/app/data/monstrao-buffer.jsonl
+      - APP_VERSION=${APP_VERSION:-}
+    networks: [default, monstrao-net]
+
+networks:
+  monstrao-net:
+    external: true
+    name: monstrao-net

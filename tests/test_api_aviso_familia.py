@@ -279,3 +279,28 @@ def test_callback_com_excecao_nao_impede_a_resposta_nem_o_episodio(db, perfil):
     )
     assert "60 segundos" in resposta
     assert obter_episodio_aberto(conectar(db), "idosa-1") is not None
+
+
+def test_rodada_de_avisos_informa_contagens_ao_hub(db, perfil, monkeypatch):
+    from zela.api import telemetria
+
+    rodadas = []
+    monkeypatch.setattr(telemetria, "registrar_avisos", lambda **kw: rodadas.append(
+        (kw["enviadas"], kw["falhas"], kw["esgotadas"])))
+    waha = _Waha(quebrados={ANA})
+    _triar(db, perfil, "tontura", T0, waha)
+    _job(db, waha, T0 + timedelta(seconds=60))
+    assert rodadas[-1] == (1, 1, 0)  # Beto recebeu, Ana falhou e terá nova tentativa
+
+
+def test_telemetria_quebrada_nao_impede_o_aviso(db, perfil, monkeypatch):
+    from zela.api import telemetria
+
+    def explode(**kw):
+        raise RuntimeError("hub")
+
+    monkeypatch.setattr(telemetria, "registrar_avisos", explode)
+    waha = _Waha()
+    _triar(db, perfil, "tontura", T0, waha)
+    _job(db, waha, T0 + timedelta(seconds=60))
+    assert len(waha.para(ANA)) == 1 and len(waha.para(BETO)) == 1

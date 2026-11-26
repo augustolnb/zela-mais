@@ -108,3 +108,29 @@ def test_processar_mensagem_retorna_mensagem_padrao_sem_evento_final():
 def test_obter_runner_zela_usa_o_agente_orquestrador():
     runner = obter_runner_zela()
     assert runner.agent.name == "orquestrador_zela"
+
+
+def test_processar_mensagem_registra_conversa_no_hub(monkeypatch):
+    from zela.api import telemetria
+
+    chamadas = []
+    monkeypatch.setattr(telemetria, "registrar_conversa", lambda inicio, eventos, erro: chamadas.append((list(eventos), erro)))
+    evento = _EventoFalso("oi")
+    processar_mensagem(_RunnerFalso([evento]), "idosa-1", "oi", datetime(2026, 9, 14, 8, 5))
+    assert chamadas == [([evento], None)]
+
+
+def test_processar_mensagem_com_erro_registra_falha_e_relanca(monkeypatch):
+    import pytest
+    from zela.api import telemetria
+
+    chamadas = []
+    monkeypatch.setattr(telemetria, "registrar_conversa", lambda inicio, eventos, erro: chamadas.append(erro))
+
+    class _RunnerQuebrado(_RunnerFalso):
+        def run(self, **kw):
+            raise TimeoutError("llm")
+
+    with pytest.raises(TimeoutError):
+        processar_mensagem(_RunnerQuebrado([]), "idosa-1", "oi", datetime(2026, 9, 14, 8, 5))
+    assert isinstance(chamadas[0], TimeoutError)

@@ -60,6 +60,17 @@ class WahaClient:
         resposta.raise_for_status()
         return resposta.json()
 
+    def status_sessao(self) -> str | None:
+        """Status da sessão no WAHA ("WORKING", "SCAN_QR_CODE", "FAILED"...); None se não responder."""
+        try:
+            resposta = httpx.get(
+                f"{self.base_url}/api/sessions/{self.session}", headers=self._headers(), timeout=5
+            )
+            resposta.raise_for_status()
+            return resposta.json().get("status")
+        except (httpx.HTTPError, ValueError, AttributeError):
+            return None
+
     def resolver_chat_id(self, telefone: str) -> str:
         """Telefone → JID real. Conta com LID recusa "<telefone>@c.us" com
         "No LID for user"; o check-exists do WAHA devolve o JID certo. Se a

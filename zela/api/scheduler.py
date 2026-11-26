@@ -4,6 +4,7 @@ from datetime import datetime
 from apscheduler.schedulers.background import BackgroundScheduler
 
 from zela.api.aviso_familia import processar_episodios
+from zela.api.telemetria import INTERVALO_HEARTBEAT_MINUTOS, checar_whatsapp, monitorar
 from zela.api.pulseira import notificar_pulseira_em_segundo_plano
 from zela.domain.compromisso_lembretes import (
     calcular_overrides_minutos_google,
@@ -380,28 +381,28 @@ def iniciar_scheduler(
 ) -> BackgroundScheduler:
     agendador = BackgroundScheduler()
     agendador.add_job(
-        verificar_e_enviar_lembretes,
+        monitorar("verificar_lembretes", verificar_e_enviar_lembretes),
         "interval",
         minutes=INTERVALO_MINUTOS,
         args=[caminho_db, id_idoso, waha_client, gmail_client],
         id="verificar_lembretes",
     )
     agendador.add_job(
-        verificar_e_enviar_lembretes_compromisso,
+        monitorar("verificar_lembretes_compromisso", verificar_e_enviar_lembretes_compromisso),
         "interval",
         minutes=INTERVALO_MINUTOS,
         args=[caminho_db, id_idoso, waha_client],
         id="verificar_lembretes_compromisso",
     )
     agendador.add_job(
-        verificar_e_escalonar_riscos,
+        monitorar("verificar_riscos", verificar_e_escalonar_riscos),
         "interval",
         minutes=INTERVALO_MONITORAMENTO_MINUTOS,
         args=[caminho_db, id_idoso, waha_client, gmail_client],
         id="verificar_riscos",
     )
     agendador.add_job(
-        verificar_sono_e_avisar,
+        monitorar("verificar_sono", verificar_sono_e_avisar),
         "cron",
         hour=9,
         minute=0,
@@ -410,7 +411,7 @@ def iniciar_scheduler(
         misfire_grace_time=3600,
     )
     agendador.add_job(
-        processar_episodios,
+        monitorar("processar_episodios", processar_episodios),
         "interval",
         seconds=INTERVALO_EPISODIOS_SEGUNDOS,
         args=[caminho_db, id_idoso, waha_client],
@@ -419,16 +420,25 @@ def iniciar_scheduler(
     if reindexar is not None:
         # Em segundo plano desde o início: embeddings não podem atrasar o boot da API.
         agendador.add_job(
-            reindexar, "interval", seconds=INTERVALO_REINDEXACAO_SEGUNDOS,
+            monitorar("reindexar_documentos", reindexar), "interval", seconds=INTERVALO_REINDEXACAO_SEGUNDOS,
             id="reindexar_documentos", next_run_time=datetime.now(),
         )
     if google_calendar_client is not None:
         agendador.add_job(
-            sincronizar_compromissos_google_agenda,
+            monitorar("sincronizar_compromissos_google_agenda", sincronizar_compromissos_google_agenda),
             "interval",
             minutes=INTERVALO_MINUTOS,
             args=[caminho_db, id_idoso, google_calendar_client],
             id="sincronizar_compromissos_google_agenda",
         )
+    # Heartbeat ao hub crm-monstrao (sem MONSTRAO_URL/TOKEN não envia nada).
+    agendador.add_job(
+        checar_whatsapp,
+        "interval",
+        minutes=INTERVALO_HEARTBEAT_MINUTOS,
+        args=[waha_client],
+        id="checar_whatsapp",
+        next_run_time=datetime.now(),
+    )
     agendador.start()
     return agendador
